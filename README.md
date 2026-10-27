@@ -47,7 +47,7 @@ Every stage is implemented end to end and covered by automated tests.
 | Escalates to | Project director | Principal |
 | Demo people | Masons, helpers, crane operator, carpenter… | Housekeeping, security guards, plumber, gardener… |
 
-**Inclusivity** — complete Tamil/English switching in both interfaces (535 strings, including statuses, errors and field names; checked by tests). Large touch targets (≥ 44–52 px), visible focus, skip links, labelled controls, text on every status (never colour alone), contrast-checked palette with dark mode, Atkinson Hyperlegible font. Read-aloud and voice input use the phone's own speech engines when available; typing always works, and the app says so when a Tamil voice is missing instead of reading Tamil with an English voice. The worker app is plain JavaScript modules with no framework: about 43 KB compressed for the code, styles and both dictionaries (fonts excluded).
+**Inclusivity** — complete Tamil/English switching in both interfaces (536 strings, including statuses, errors and field names; checked by tests). Large touch targets (≥ 44–52 px), visible focus, skip links, labelled controls, text on every status (never colour alone), contrast-checked palette with dark mode, Atkinson Hyperlegible font. Read-aloud and voice input use the phone's own speech engines when available; typing always works, and the app says so when a Tamil voice is missing instead of reading Tamil with an English voice. The worker app is plain JavaScript modules with no framework: about 43 KB compressed for the code, styles and both dictionaries (fonts excluded).
 
 ## Try the demo
 

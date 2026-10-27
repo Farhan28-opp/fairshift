@@ -389,6 +389,7 @@
  "col.hours7": "மணி நேரம் (7 நாள்)",
  "col.ot7": "கூடுதல் நேரம் (7 நாள்)",
  "col.flags": "எச்சரிக்கைகள்",
+ "col.actions": "நடவடிக்கைகள்",
  "config.title": "{industry} அமைப்பு",
  "config.wageType": "சம்பள வகை",
  "config.dailyHours": "நாளுக்கு வழக்கமான நேரம்",

@@ -338,7 +338,7 @@ async function renderRadar(focus) {
     ),
     h(
       'section',
-      { class: 'card', 'aria-labelledby': 'workers-title' },
+      { class: 'card' },
       h('h2', { class: 'card-title', id: 'workers-title' }, t('radar.workers')),
       h(
         'div',
@@ -796,7 +796,7 @@ function evidenceSection(c, ev, status) {
       h(
         'table',
         { class: 'data' },
-        h('thead', null, h('tr', null, [t('pay.col.day'), t('pay.col.in'), t('pay.col.out'), t('pay.col.hours'), t('col.flags'), ''].map((x) => h('th', { scope: 'col' }, x)))),
+        h('thead', null, h('tr', null, [t('pay.col.day'), t('pay.col.in'), t('pay.col.out'), t('pay.col.hours'), t('col.flags')].map((x) => h('th', { scope: 'col' }, x)), h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, t('col.actions'))))),
         h('tbody', null, ev.current.records.map(recordRow)),
       ),
     ),

@@ -389,6 +389,7 @@
  "col.hours7": "Hours (7 days)",
  "col.ot7": "Overtime (7 days)",
  "col.flags": "Flags",
+ "col.actions": "Actions",
  "config.title": "{industry} configuration",
  "config.wageType": "Wage type",
  "config.dailyHours": "Normal hours a day",
