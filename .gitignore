@@ -1,7 +1,8 @@
 node_modules/
-data/
+/data/
 .env
 .env.*
+!.env.example
 coverage/
 *.log
 .DS_Store

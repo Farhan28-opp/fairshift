@@ -2,6 +2,7 @@
 import { h, toast } from './dom.js';
 import * as i18n from './i18n.js';
 import { speak, stopSpeaking, canSpeak, canListen, listen } from './voice.js';
+import { icon } from './icons.js';
 
 const { t } = i18n;
 
@@ -81,7 +82,7 @@ export function listenButton(getText, { lang = () => i18n.lang(), label = t('com
         else toast(t('voice.noVoice'), 'error');
       },
     },
-    h('span', { 'aria-hidden': 'true' }, '🔊'),
+    icon('volume', 18),
     h('span', null, label),
   );
   return btn;
@@ -121,7 +122,7 @@ export function micButton(target) {
         });
       },
     },
-    h('span', { 'aria-hidden': 'true' }, '🎤'),
+    icon('mic', 18),
     label,
   );
   return btn;

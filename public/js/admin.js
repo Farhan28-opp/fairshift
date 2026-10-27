@@ -1,5 +1,6 @@
 import { h, mount, toast, storage } from './dom.js';
 import { api } from './api.js';
+import { icon } from './icons.js';
 import * as i18n from './i18n.js';
 import {
   errorText,
@@ -280,8 +281,8 @@ async function renderRadar(focus) {
     h(
       href ? 'a' : 'div',
       { class: `kpi${tone ? ` kpi-${tone}` : ''}`, href },
+      h('span', { class: 'kpi-label' }, h('span', { class: 'kpi-dot', 'aria-hidden': 'true' }), label),
       h('span', { class: 'kpi-value' }, i18n.num(value, 0)),
-      h('span', { class: 'kpi-label' }, label),
       note ? h('span', { class: 'kpi-note' }, note) : null,
     );
   const maxPresent = Math.max(1, k.headcount);
@@ -652,7 +653,7 @@ function drawCase(detail, focus) {
 
   shell(
     focus,
-    h('a', { class: 'back', href: '#/cases' }, h('span', { 'aria-hidden': 'true' }, '←'), t('admin.cases')),
+    h('a', { class: 'back', href: '#/cases' }, icon('back', 20), t('admin.cases')),
     h(
       'div',
       { class: 'case-head' },
@@ -679,7 +680,7 @@ function drawCase(detail, focus) {
           c.status === 'resolved' ? h('p', null, t('case.awaitingWorker')) : null,
         )
       : null,
-    c.status === 'closed' ? h('p', { class: 'alert alert-go' }, '✅ ', t('case.closedAdmin', { when: i18n.dateTime(c.verification?.at || c.updatedAt) })) : null,
+    c.status === 'closed' ? h('p', { class: 'alert alert-go' }, icon('check', 20), t('case.closedAdmin', { when: i18n.dateTime(c.verification?.at || c.updatedAt) })) : null,
     h(
       'div',
       { class: 'admin-grid' },

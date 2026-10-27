@@ -2,6 +2,7 @@ import { h, mount, toast, storage } from './dom.js';
 import { api } from './api.js';
 import * as i18n from './i18n.js';
 import { speak, stopSpeaking, canSpeak } from './voice.js';
+import { icon } from './icons.js';
 import {
   errorText,
   busy,
@@ -49,7 +50,7 @@ function header() {
     ? h(
         'button',
         { type: 'button', class: 'listen', id: 'listen', 'aria-pressed': 'false', onclick: toggleReading },
-        h('span', { 'aria-hidden': 'true' }, '🔊'),
+        icon('volume', 20),
         h('span', { class: 'listen-label' }, t('common.listen')),
       )
     : null;
@@ -89,7 +90,7 @@ function shell(focus, ...content) {
 }
 
 const back = (href = '#/', label = t('common.back')) =>
-  h('a', { class: 'back', href }, h('span', { 'aria-hidden': 'true' }, '←'), label);
+  h('a', { class: 'back', href }, icon('back', 20), label);
 const title = (text) => h('h1', { class: 'view-title' }, text);
 const loading = (focus) => shell(focus, h('p', { class: 'loading', role: 'status' }, t('common.loading')));
 
@@ -313,23 +314,24 @@ function drawHome(focus) {
 
   let punch;
   if (shift) {
-    const elapsed = h('span', { class: 'punch-elapsed' }, elapsedText(shift.checkIn));
-    const btn = h(
-      'button',
-      { type: 'button', class: 'punch-btn', onclick: () => busy(btn, checkOut) },
-      h('span', { class: 'punch-meta' }, t('home.onShiftSince', { time: i18n.time(shift.checkIn) })),
+    const elapsed = h('p', { class: 'shift-elapsed' }, elapsedText(shift.checkIn));
+    const btn = h('button', { type: 'button', class: 'btn btn-hivis btn-block', onclick: () => busy(btn, checkOut) }, icon('clock', 20), t('home.checkOut'));
+    punch = h(
+      'section',
+      { class: 'shift-card is-on', 'aria-live': 'off' },
+      h('p', { class: 'shift-status' }, h('span', { class: 'live-dot', 'aria-hidden': 'true' }), t('home.onShiftSince', { time: i18n.time(shift.checkIn) })),
       elapsed,
-      h('span', { class: 'punch-action' }, t('home.checkOut')),
+      btn,
     );
-    punch = h('div', { class: 'punch-ring is-on' }, btn);
     state.timer = setInterval(() => {
       elapsed.textContent = elapsedText(shift.checkIn);
     }, 30_000);
   } else {
     punch = h(
-      'div',
-      { class: 'punch-ring' },
-      h('a', { class: 'punch-btn', href: '#/checkin' }, h('span', { class: 'punch-meta' }, t('home.notOnShift')), h('span', { class: 'punch-action' }, t('home.checkIn'))),
+      'section',
+      { class: 'shift-card' },
+      h('p', { class: 'shift-status' }, h('span', { class: 'idle-dot', 'aria-hidden': 'true' }), t('home.notOnShift')),
+      h('a', { class: 'btn btn-hivis btn-block btn-large', href: '#/checkin' }, icon('clock', 22), t('home.checkIn')),
     );
   }
 
@@ -339,7 +341,7 @@ function drawHome(focus) {
       h(
         'section',
         { class: 'alert alert-stop' },
-        h('h2', { class: 'alert-title' }, '⚠️ ', t('home.missingTitle', { day: i18n.day(m.day) })),
+        h('h2', { class: 'alert-title' }, icon('alert', 20), t('home.missingTitle', { day: i18n.day(m.day) })),
         h('p', null, t('home.missingText', { hours: home.rules.staleShiftHours })),
         h('a', { class: 'btn btn-small btn-danger', href: `#/dispute?line=basic&reason=hours_missing&month=${m.day.slice(0, 7)}&day=${m.day}` }, t('home.missingAction')),
       ),
@@ -350,7 +352,7 @@ function drawHome(focus) {
       h(
         'a',
         { class: 'alert alert-go alert-link', href: '#/cases' },
-        h('span', { class: 'alert-title' }, '✅ ', t('home.confirmTitle', { count: home.cases.awaitingConfirmation })),
+        h('span', { class: 'alert-title' }, icon('check', 20), t('home.confirmTitle', { count: home.cases.awaitingConfirmation })),
         h('span', null, t('home.confirmText')),
       ),
     );
@@ -360,7 +362,7 @@ function drawHome(focus) {
       h(
         'section',
         { class: `alert ${home.fatigue.some((f) => f.severity === 'critical') ? 'alert-stop' : ''}` },
-        h('h2', { class: 'alert-title' }, '⏱️ ', t('fatigue.title')),
+        h('h2', { class: 'alert-title' }, icon('clock', 20), t('fatigue.title')),
         h('ul', null, home.fatigue.map((f) => h('li', null, t(`fatigue.${f.code}`, { value: i18n.num(f.value), limit: f.limit })))),
         h('p', null, t('fatigue.advice')),
       ),
@@ -398,11 +400,11 @@ function drawHome(focus) {
     h('a', { class: 'link', href: '#/shifts' }, t('home.allShifts')),
   );
 
-  const tile = (cls, href, icon, label, badge) =>
+  const tile = (cls, href, glyph, label, badge) =>
     h(
       'a',
       { class: `tile tile-${cls}`, href },
-      h('span', { class: 'tile-icon', 'aria-hidden': 'true' }, icon),
+      h('span', { class: 'tile-icon', 'aria-hidden': 'true' }, icon(glyph)),
       h('span', null, label),
       badge ? h('span', { class: 'pill pill-quiet tile-badge' }, badge) : null,
     );
@@ -421,10 +423,10 @@ function drawHome(focus) {
     h(
       'nav',
       { class: 'tiles', 'aria-label': t('home.menu') },
-      tile('pay', '#/pay', '₹', t('tile.pay')),
-      tile('report', '#/speak', '🛡️', t('tile.speak')),
-      tile('cases', '#/cases', '📋', t('tile.cases'), home.cases.active ? t('tile.activeCount', { count: home.cases.active }) : null),
-      tile('track', '#/track', '🔒', t('tile.track')),
+      tile('pay', '#/pay', 'wallet', t('tile.pay')),
+      tile('report', '#/speak', 'shield', t('tile.speak')),
+      tile('cases', '#/cases', 'clipboard', t('tile.cases'), home.cases.active ? t('tile.activeCount', { count: home.cases.active }) : null),
+      tile('track', '#/track', 'lock', t('tile.track')),
     ),
     h(
       'div',
@@ -719,7 +721,7 @@ async function renderPay(focus) {
     h(
       'p',
       { class: `alert ${wage.ok ? 'alert-go' : 'alert-stop'}` },
-      wage.ok ? '✅ ' : '⚠️ ',
+      icon(wage.ok ? 'check' : 'alert', 20),
       t(wage.ok ? 'pay.minWageOk' : 'pay.minWageLow', { rate: i18n.money(wage.dailyRate), min: i18n.money(wage.minimum) }),
     ),
     h('section', { class: 'card' }, h('h2', { class: 'card-title' }, t('pay.earnings')), h('ul', { class: 'rows' }, earnings.map(row))),
@@ -1271,7 +1273,7 @@ function drawCase(c, { focus, backHref, send, banner = null }) {
           h('p', { class: 'row-detail' }, t('case.resolvedBy', { person: personLabel(c.resolution.by), when: i18n.dateTime(c.resolution.at) })),
         )
       : null,
-    c.status === 'closed' ? h('p', { class: 'alert alert-go' }, '✅ ', t('case.closedText', { when: i18n.dateTime(c.verification?.at || c.updatedAt) })) : null,
+    c.status === 'closed' ? h('p', { class: 'alert alert-go' }, icon('check', 20), t('case.closedText', { when: i18n.dateTime(c.verification?.at || c.updatedAt) })) : null,
     verify,
     h(
       'section',
