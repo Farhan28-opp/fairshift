@@ -1,0 +1,29 @@
+{
+  "name": "fairshift",
+  "version": "1.0.0",
+  "description": "FairShift: a decent-work platform (UN SDG 8) for shift workers. Shift check-in, plain-language payslips, anonymous safety reports and feedback, skill passport, fatigue and attrition insights.",
+  "private": true,
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "DEMO_MODE=true node --watch src/server.js",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "compression": "^1.8.2",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0"
+  },
+  "license": "MIT"
+}
