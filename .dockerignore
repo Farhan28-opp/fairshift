@@ -1,0 +1,13 @@
+.git
+node_modules
+data
+test
+coverage
+*.log
+.env
+.env.*
+Dockerfile
+.dockerignore
+.gcloudignore
+README.md
+scripts

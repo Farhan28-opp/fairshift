@@ -36,6 +36,8 @@ export async function busy(button, fn) {
 
 /** Shows an error next to a form and announces it. */
 export function showError(statusEl, err) {
+  // A bug in our own code (not an API answer) is logged so it can be found.
+  if (err instanceof Error && err.status === undefined) console.error(err);
   const message = typeof err === 'string' ? err : errorText(err);
   if (statusEl) {
     statusEl.textContent = message;

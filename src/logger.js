@@ -20,9 +20,10 @@ function requestLogger(logger) {
   return (req, res, next) => {
     const start = process.hrtime.bigint();
     res.on('finish', () => {
-      if (req.path === '/healthz') return;
+      const path = req.originalUrl.split('?')[0];
+      if (path === '/healthz') return;
       const ms = Number(process.hrtime.bigint() - start) / 1e6;
-      logger.info('request', { method: req.method, path: req.path, status: res.statusCode, ms: Math.round(ms) });
+      logger.info('request', { method: req.method, path, status: res.statusCode, ms: Math.round(ms) });
     });
     next();
   };

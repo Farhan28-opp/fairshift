@@ -523,8 +523,9 @@ function caseAction(c, path, body, okMessage, statusEl) {
   return api(`/api/admin/cases/${encodeURIComponent(c.id)}/${path}`, { method: 'POST', body })
     .then((detail) => {
       toast(okMessage, 'ok');
-      state.overview = null; // counts changed
       drawCase(detail, false);
+      // Counts on the tabs changed; refresh them quietly.
+      loadOverview().catch(() => {});
     })
     .catch((err) => showError(statusEl, err));
 }
