@@ -5,56 +5,42 @@ const express = require('express');
 const v = require('../validate');
 const { HttpError } = require('../errors');
 const { createRateLimiter } = require('../rateLimit');
-const { presentReportForWorker, presentPayQuery } = require('../present');
 const { LANGS } = require('./auth');
-const { sectorPreset } = require('../../config/sectors');
-const { MINUTE, HOUR, DAY, dayKey, monthKey, addDays, addMonths, weekKey, round1 } = require('../../domain/time');
-const { siteCode, isWithinGeofence, distanceMeters, splitHours, shiftHours } = require('../../domain/shifts');
-const { computePayslip } = require('../../domain/payroll');
+const { RUPEE, industryPreset } = require('../../config/industries');
+const { HOUR, DAY, dayKey, monthKey, addDays, addMonths, round1, round2 } = require('../../domain/time');
+const { siteCode, splitHours, shiftHours, isStale, currentShift, missingCheckouts } = require('../../domain/shifts');
 const { evaluateFatigue } = require('../../domain/fatigue');
-const { triage, maxSeverity } = require('../../domain/triage');
-const {
-  FEEDBACK_ASPECTS,
-  newTrackingToken,
-  hashToken,
-  coarsenTime,
-  ballotKey,
-} = require('../../domain/anonymity');
-const { buildPassport } = require('../../domain/passport');
-
-const MAX_OFFLINE_AGE = 72 * HOUR;
-const TOKEN_RE = /^[A-Za-z0-9_-]{16}$/;
+const { PAY_REASONS, isActive, normalizeRef, reporterView } = require('../../domain/cases');
 
 const sameCode = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
-/**
- * Check-ins made offline are queued on the phone and sent later with the time
- * they happened. Accept that time if it is recent and not in the future.
- */
-function eventTime(clientTime, now) {
-  if (clientTime == null) return { ts: now, offline: false };
-  const ts = v.integer(clientTime, 'clientTime', { min: now - MAX_OFFLINE_AGE, max: now + 2 * MINUTE });
-  return { ts: Math.min(ts, now), offline: now - ts > MINUTE };
-}
+/** Payslips a worker can open and dispute: this month and the two before. */
+const payMonths = (now, tz) => {
+  const current = monthKey(now, tz);
+  return [current, addMonths(current, -1), addMonths(current, -2)];
+};
 
-function workerRouter({ store, clock, config, ai, logger }) {
+function workerRouter({ repo, clock, config, cases }) {
   const r = express.Router();
   const writeLimit = createRateLimiter({ windowMs: HOUR, max: 60, key: (req) => req.user.id, clock });
-  const orgOf = (req) => store.getOrg(req.user.orgId);
+  const orgOf = (req) => repo.getOrg(req.user.orgId);
 
-  r.get('/home', (req, res) => {
+  async function myCase(req) {
+    const ref = normalizeRef(req.params.ref);
+    const record = ref ? await repo.findCaseByRef(ref) : null;
+    // Only the named reporter can open an identified case here; anonymous ones go through the access code.
+    if (!record || record.reporterId !== req.user.id) throw new HttpError(404, 'not_found');
+    return record;
+  }
+
+  r.get('/home', async (req, res) => {
     const now = clock();
-    const org = orgOf(req);
-    const shifts = store.shiftsFor(req.user.id);
-    const open = store.openShift(req.user.id);
+    const org = await orgOf(req);
+    const [shifts, mine] = await Promise.all([repo.shiftsForUser(req.user.id), repo.casesForReporter(req.user.id)]);
     const today = dayKey(now, org.tz);
-
-    const split = splitHours(
-      shifts.filter((s) => s.checkIn >= now - 14 * DAY),
-      org.rules,
-      org.tz,
-    );
-    const byDay = new Map(split.days.map((d) => [d.day, d]));
+    const current = currentShift(shifts, org.rules, now);
+    const recent = shifts.filter((s) => s.checkIn >= now - 14 * DAY && !isStale(s, org.rules, now));
+    const byDay = new Map(splitHours(recent, org.rules, org.tz).days.map((d) => [d.day, d]));
     const week = Array.from({ length: 7 }, (_, i) => {
       const day = addDays(today, i - 6);
       const d = byDay.get(day);
@@ -62,194 +48,186 @@ function workerRouter({ store, clock, config, ai, logger }) {
     });
 
     res.json({
-      shift: open ? { checkIn: open.checkIn, method: open.method } : null,
+      shift: current ? { id: current.id, checkIn: current.checkIn, method: current.method } : null,
       week,
       weekHours: round1(week.reduce((s, d) => s + d.hours, 0)),
       weekOvertime: round1(week.reduce((s, d) => s + d.overtime, 0)),
       fatigue: evaluateFatigue(shifts, org.rules, now, org.tz),
-      feedbackGiven: store.hasBallot(ballotKey(config.appSecret, req.user.id, weekKey(today))),
-      rules: { dailyHours: org.rules.dailyHours, overtimeMultiplier: org.rules.overtimeMultiplier },
-      // Demo only: shows today's site code so judges can check in without the printed QR poster.
-      demo: config.demoMode ? { siteCode: siteCode(config.appSecret, org.site.id, today) } : undefined,
+      missingCheckouts: missingCheckouts(shifts, org.rules, now).map((s) => ({ id: s.id, day: dayKey(s.checkIn, org.tz), checkIn: s.checkIn })),
+      cases: { active: mine.filter(isActive).length, awaitingConfirmation: mine.filter((c) => c.status === 'resolved').length },
+      rules: { dailyHours: org.rules.dailyHours, overtimeMultiplier: org.rules.overtimeMultiplier, staleShiftHours: org.rules.staleShiftHours },
+      // Demo only: today's site code, so evaluators can check in without the printed QR poster.
+      demo: config.demoMode ? { siteCode: siteCode(org.checkinSecret, org.siteId, today) } : undefined,
       serverTime: now,
     });
   });
 
-  r.post('/checkin', writeLimit, (req, res) => {
+  r.post('/checkin', writeLimit, async (req, res) => {
     const now = clock();
-    const org = orgOf(req);
-    const body = req.body || {};
-    const method = v.oneOf(body.method, 'method', ['qr', 'code', 'gps']);
-    const { ts, offline } = eventTime(body.clientTime, now);
+    const org = await orgOf(req);
+    const method = v.oneOf(req.body?.method, 'method', ['qr', 'code']);
+    const code = v.pattern(req.body?.code, 'code', /^\d{6}$/);
+    if (!sameCode(code, siteCode(org.checkinSecret, org.siteId, dayKey(now, org.tz)))) throw new HttpError(422, 'wrong_code');
 
-    if (store.openShift(req.user.id)) throw new HttpError(409, 'already_checked_in');
+    const shifts = await repo.shiftsForUser(req.user.id);
+    if (currentShift(shifts, org.rules, now)) throw new HttpError(409, 'already_checked_in');
+    if (shifts.some((s) => s.checkOut != null && s.checkOut > now)) throw new HttpError(409, 'overlaps_previous_shift');
 
-    if (method === 'gps') {
-      const point = {
-        lat: v.number(body.lat, 'lat', { min: -90, max: 90 }),
-        lng: v.number(body.lng, 'lng', { min: -180, max: 180 }),
-        accuracy: v.number(body.accuracy, 'accuracy', { min: 0, max: 10_000, optional: true }),
-      };
-      if (!isWithinGeofence(point, org.site)) {
-        throw new HttpError(422, 'outside_site', { distanceM: Math.round(distanceMeters(point, org.site)) });
-      }
-    } else {
-      const code = v.pattern(body.code, 'code', /^\d{6}$/);
-      if (!sameCode(code, siteCode(config.appSecret, org.site.id, dayKey(ts, org.tz)))) {
-        throw new HttpError(422, 'wrong_code');
-      }
-    }
-
-    const lastOut = Math.max(0, ...store.shiftsFor(req.user.id).map((s) => s.checkOut || 0));
-    if (ts < lastOut) throw new HttpError(409, 'overlaps_previous_shift');
-
-    const shift = store.addShift({ userId: req.user.id, orgId: org.id, checkIn: ts, method, offlineSync: offline });
-    res.status(201).json({ shift: { checkIn: shift.checkIn, method: shift.method } });
+    const shift = { id: `sh_${crypto.randomUUID()}`, orgId: org.id, userId: req.user.id, checkIn: now, checkOut: null, method, corrections: [] };
+    await repo.putShift(shift);
+    res.status(201).json({ shift: { id: shift.id, checkIn: shift.checkIn, method } });
   });
 
-  r.post('/checkout', writeLimit, (req, res) => {
+  r.post('/checkout', writeLimit, async (req, res) => {
     const now = clock();
-    const org = orgOf(req);
-    const open = store.openShift(req.user.id);
+    const org = await orgOf(req);
+    const open = currentShift(await repo.shiftsForUser(req.user.id), org.rules, now);
     if (!open) throw new HttpError(409, 'not_checked_in');
-    const { ts, offline } = eventTime(req.body?.clientTime, now);
-    if (ts <= open.checkIn) throw new HttpError(422, 'invalid_time');
-
-    const shift = store.closeShift(open.id, req.user.id, { checkOut: ts, offlineSync: open.offlineSync || offline });
+    const shift = await repo.updateShift(open.id, (s) => {
+      if (!s || s.checkOut != null) throw new HttpError(409, 'not_checked_in');
+      return { ...s, checkOut: now };
+    });
     const day = dayKey(shift.checkIn, org.tz);
-    const dayTotals = splitHours(
-      store.shiftsFor(req.user.id).filter((s) => dayKey(s.checkIn, org.tz) === day),
-      { ...org.rules, weeklyHours: Infinity },
-      org.tz,
-    );
+    const all = await repo.shiftsForUser(req.user.id);
+    const dayTotals = splitHours(all.filter((s) => dayKey(s.checkIn, org.tz) === day), { ...org.rules, weeklyHours: Infinity }, org.tz);
     res.json({
-      shift: { checkIn: shift.checkIn, checkOut: shift.checkOut, hours: round1(shiftHours(shift)) },
+      shift: { id: shift.id, checkIn: shift.checkIn, checkOut: shift.checkOut, hours: round2(shiftHours(shift)) },
       today: { hours: round1(dayTotals.hours), overtime: round1(dayTotals.overtimeHours) },
-      fatigue: evaluateFatigue(store.shiftsFor(req.user.id), org.rules, now, org.tz),
+      fatigue: evaluateFatigue(all, org.rules, now, org.tz),
     });
   });
 
-  r.get('/payslip', (req, res) => {
+  /** The worker's own attendance records for the last two weeks. */
+  r.get('/shifts', async (req, res) => {
     const now = clock();
-    const org = orgOf(req);
-    const current = monthKey(now, org.tz);
-    const months = [current, addMonths(current, -1), addMonths(current, -2)];
-    const month = req.query.month == null ? current : v.oneOf(String(req.query.month), 'month', months);
-    const payslip = computePayslip({
-      worker: req.user,
-      shifts: store.shiftsFor(req.user.id),
-      rules: org.rules,
-      month,
-      tzOffsetMinutes: org.tz,
-      minimumDailyWage: org.minimumDailyWage,
-    });
-    const queries = store
-      .payQueriesForUser(req.user.id)
-      .filter((q) => q.month === month)
-      .map((q) => presentPayQuery(q));
-    res.json({ payslip, months, inProgress: month === current, queries });
+    const org = await orgOf(req);
+    const shifts = await repo.shiftsForUser(req.user.id);
+    const split = new Map(splitHours(shifts, org.rules, org.tz).days.map((d) => [d.day, d]));
+    const list = shifts
+      .filter((s) => s.checkIn >= now - 14 * DAY)
+      .reverse()
+      .map((s) => {
+        const day = dayKey(s.checkIn, org.tz);
+        let status = 'done';
+        if (s.checkOut == null) status = isStale(s, org.rules, now) ? 'missing_checkout' : 'on_shift';
+        return {
+          id: s.id,
+          day,
+          checkIn: s.checkIn,
+          checkOut: s.checkOut,
+          hours: s.checkOut == null ? null : round2(shiftHours(s)),
+          dayOvertime: round2(split.get(day)?.overtime || 0),
+          status,
+          method: s.method,
+          corrected: Boolean(s.corrections?.length),
+        };
+      });
+    res.json({ shifts: list, rules: { dailyHours: org.rules.dailyHours, weeklyHours: org.rules.weeklyHours } });
   });
 
-  r.post('/pay-queries', writeLimit, (req, res) => {
+  r.get('/payslip', async (req, res) => {
     const now = clock();
-    const org = orgOf(req);
-    const current = monthKey(now, org.tz);
-    const month = v.oneOf(req.body?.month, 'month', [current, addMonths(current, -1), addMonths(current, -2)]);
-    const lineCode = v.pattern(req.body?.lineCode, 'lineCode', /^[a-z_]{2,20}$/);
-    const message = v.text(req.body?.message, 'message', { max: 500, optional: true });
-    const query = store.addPayQuery({ orgId: org.id, userId: req.user.id, month, lineCode, message, createdAt: now });
-    res.status(201).json({ query: presentPayQuery(query) });
+    const org = await orgOf(req);
+    const months = payMonths(now, org.tz);
+    const month = req.query.month == null ? months[0] : v.oneOf(String(req.query.month), 'month', months);
+    const payslip = await cases.payslipFor(org, req.user, month);
+    const people = await cases.people(org.id);
+    const disputes = (await repo.casesForReporter(req.user.id))
+      .filter((c) => c.type === 'pay' && c.pay?.month === month)
+      .map((c) => reporterView(c, people, now));
+    res.json({ payslip, months, inProgress: month === months[0], wage: req.user.wage, reasons: PAY_REASONS, disputes });
   });
 
-  r.post('/reports', writeLimit, (req, res) => {
+  /** PayProof: dispute one line of a payslip, optionally pointing at specific days. */
+  r.post('/disputes', writeLimit, async (req, res) => {
     const now = clock();
-    const org = orgOf(req);
+    const org = await orgOf(req);
     const body = req.body || {};
-    const category = v.oneOf(body.category, 'category', sectorPreset(org.sector).hazards);
-    const description = v.text(body.description, 'description', { min: 3, max: 1000 });
+    const month = v.oneOf(body.month, 'month', payMonths(now, org.tz));
+    const payslip = await cases.payslipFor(org, req.user, month);
+    const lineCode = v.oneOf(body.lineCode, 'lineCode', payslip.lines.map((l) => l.code));
+    const reason = v.oneOf(body.reason, 'reason', PAY_REASONS);
+    const days = v.days(body.days, 'days', month);
+    const expected = v.integer(body.expectedRupees, 'expectedRupees', { min: 0, max: 1_000_000, optional: true });
+    const message = v.text(body.message, 'message', { min: 3, max: 1000 });
+    const inputMode = v.oneOf(body.inputMode ?? 'text', 'inputMode', ['text', 'voice']);
+    const lang = v.oneOf(body.lang ?? req.user.lang, 'lang', LANGS);
+
+    const record = await cases.createPayDispute({
+      org,
+      worker: req.user,
+      payslip,
+      lineCode,
+      reason,
+      days,
+      expectedAmount: expected == null ? null : expected * RUPEE,
+      message,
+      lang,
+      inputMode,
+      now,
+    });
+    res.status(201).json({ case: reporterView(record, await cases.people(org.id), now) });
+  });
+
+  /** SpeakSafe: report a hazard or grievance. Anonymous reports store no link to this account. */
+  r.post('/reports', writeLimit, async (req, res) => {
+    const now = clock();
+    const org = await orgOf(req);
+    const body = req.body || {};
+    const category = v.oneOf(body.category, 'category', industryPreset(org.industry).categories);
+    const description = v.text(body.description, 'description', { min: 5, max: 1000 });
     const anonymous = v.bool(body.anonymous, 'anonymous');
     const inputMode = v.oneOf(body.inputMode ?? 'text', 'inputMode', ['text', 'voice']);
     const lang = v.oneOf(body.lang ?? req.user.lang, 'lang', LANGS);
 
-    const { severity, matchedKeywords } = triage({ category, description });
-    const token = anonymous ? newTrackingToken() : null;
-    // Anonymous: no reporter id, only a hash of the phone's secret token, time rounded to the hour.
-    const createdAt = anonymous ? coarsenTime(now, HOUR) : now;
-    const report = store.addReport({
-      orgId: org.id,
+    const { record, accessCode } = await cases.createReport({
+      org,
+      reporter: anonymous ? null : req.user,
       category,
       description,
       lang,
       inputMode,
-      anonymous,
-      reporterId: anonymous ? null : req.user.id,
-      tokenHash: token ? hashToken(token) : null,
-      severity,
-      matchedKeywords,
-      summaryEn: null,
-      createdAt,
-      updatedAt: createdAt,
+      now,
     });
-
-    if (ai.enabled) {
-      ai.analyzeReport({ description, category, sector: org.sector })
-        .then((result) => {
-          if (!result) return;
-          store.updateReport(report.id, {
-            summaryEn: result.summaryEn,
-            severity: maxSeverity(report.severity, result.severity),
-            aiAssisted: true,
-          });
-        })
-        .catch((err) => logger.warn('ai_enrichment_failed', { reason: err?.name }));
-    }
-
-    res.status(201).json({ report: presentReportForWorker(report), trackingToken: token });
+    res.status(201).json({ case: reporterView(record, await cases.people(org.id), now), accessCode });
   });
 
-  r.get('/reports', (req, res) => {
-    res.json({ reports: store.reportsByReporter(req.user.id).map(presentReportForWorker) });
-  });
-
-  /** Anonymous reports are followed with the secret tokens kept on the phone. */
-  r.post('/reports/track', (req, res) => {
-    const tokens = req.body?.tokens;
-    if (!Array.isArray(tokens) || tokens.length > 50) throw new HttpError(400, 'invalid_input', { field: 'tokens' });
-    const hashes = tokens.map((t) => hashToken(v.pattern(t, 'tokens', TOKEN_RE)));
-    const found = new Map(store.reportsByTokenHashes(req.user.orgId, hashes).map((rep) => [rep.tokenHash, rep]));
-    res.json({ reports: hashes.map((h) => (found.has(h) ? presentReportForWorker(found.get(h)) : null)) });
-  });
-
-  r.post('/feedback', writeLimit, (req, res) => {
+  r.get('/cases', async (req, res) => {
     const now = clock();
-    const org = orgOf(req);
-    const today = dayKey(now, org.tz);
-    const week = weekKey(today);
-    const ballot = ballotKey(config.appSecret, req.user.id, week);
-    if (store.hasBallot(ballot)) throw new HttpError(409, 'already_submitted');
-
-    const scores = {};
-    for (const aspect of FEEDBACK_ASPECTS) {
-      scores[aspect] = v.integer(req.body?.scores?.[aspect], `scores.${aspect}`, { min: 1, max: 5 });
-    }
-    const comment = v.text(req.body?.comment, 'comment', { max: 500, optional: true });
-    store.addFeedback({ orgId: org.id, week, submittedOn: today, scores, comment }, ballot);
-    res.status(201).json({ ok: true });
+    const org = await orgOf(req);
+    const list = await cases.sweep(org, await repo.casesForReporter(req.user.id), now);
+    const people = await cases.people(org.id);
+    res.json({ cases: list.map((c) => reporterView(c, people, now)) });
   });
 
-  r.get('/passport', (req, res) => {
-    const org = orgOf(req);
-    const passport = buildPassport({ worker: req.user, org, shifts: store.shiftsFor(req.user.id), tzOffsetMinutes: org.tz });
-    res.json({ passport, shareId: req.user.passportShared ? req.user.passportShareId : null });
+  r.get('/cases/:ref', async (req, res) => {
+    const now = clock();
+    const org = await orgOf(req);
+    const [record] = await cases.sweep(org, [await myCase(req)], now);
+    res.json({ case: reporterView(record, await cases.people(org.id), now) });
   });
 
-  r.post('/passport/share', writeLimit, (req, res) => {
-    const enabled = v.bool(req.body?.enabled, 'enabled');
-    store.updateUser(req.user.id, { passportShared: enabled });
-    res.json({ shareId: enabled ? req.user.passportShareId : null });
+  r.post('/cases/:ref/messages', writeLimit, async (req, res) => {
+    const now = clock();
+    const org = await orgOf(req);
+    const record = await myCase(req);
+    const text = v.text(req.body?.text, 'text', { min: 1, max: 1000 });
+    const updated = await cases.act(org, record.id, 'message', { actor: { type: 'worker', id: req.user.id }, now, text });
+    res.status(201).json({ case: reporterView(updated, await cases.people(org.id), now) });
+  });
+
+  /** The Fairness Loop's last step: the worker confirms the fix, or reopens the case. */
+  r.post('/cases/:ref/verify', writeLimit, async (req, res) => {
+    const now = clock();
+    const org = await orgOf(req);
+    const record = await myCase(req);
+    const accepted = v.bool(req.body?.accepted, 'accepted');
+    const note = v.text(req.body?.note, 'note', { max: 1000, optional: accepted });
+    const updated = await cases.act(org, record.id, accepted ? 'confirm' : 'reopen', { actor: { type: 'worker', id: req.user.id }, now, note });
+    res.json({ case: reporterView(updated, await cases.people(org.id), now) });
   });
 
   return r;
 }
 
-module.exports = { workerRouter, eventTime };
+module.exports = { workerRouter, payMonths };

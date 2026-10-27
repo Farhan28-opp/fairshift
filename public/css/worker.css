@@ -27,6 +27,7 @@ body {
   align-items: center;
   gap: 8px;
   margin-right: auto;
+  min-height: 44px;
   font-weight: 700;
   font-size: 1.15rem;
   text-decoration: none;
@@ -38,15 +39,16 @@ body {
   background: var(--hivis);
   border: 4px solid var(--ink);
 }
-.lang-select {
-  min-height: 44px;
-  padding: 6px 10px;
-  border: 2px solid var(--line);
-  border-radius: var(--r-s);
-  background: var(--surface);
-  font-weight: 700;
+.bar .lang-switch {
+  flex: none;
+}
+.bar .lang-switch button {
+  padding: 4px 10px;
+  font-size: 0.95rem;
+  white-space: nowrap;
 }
 .listen {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -71,22 +73,8 @@ body {
 .view:focus {
   outline: none;
 }
-.view-title {
-  font-size: 1.75rem;
-  line-height: 1.2;
-}
-.lede {
-  color: var(--ink-soft);
-}
-.back {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0 4px;
-  font-weight: 700;
-  text-decoration: none;
+form.view {
+  padding-top: 0;
 }
 
 /* The punch disc: the one loud thing on the home screen */
@@ -138,11 +126,6 @@ body {
 }
 .punch-btn:focus-visible {
   outline-offset: 8px;
-}
-.queue-note {
-  text-align: center;
-  color: var(--warn);
-  font-weight: 700;
 }
 
 /* Week strip */
@@ -224,7 +207,7 @@ body {
   background: var(--surface);
   text-decoration: none;
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   line-height: 1.2;
 }
 .tile-icon {
@@ -241,10 +224,10 @@ body {
 .tile-report .tile-icon {
   background: var(--stop-soft);
 }
-.tile-feedback .tile-icon {
+.tile-cases .tile-icon {
   background: var(--quiet-soft);
 }
-.tile-skills .tile-icon {
+.tile-track .tile-icon {
   background: var(--hivis-soft);
 }
 .tile-badge {
@@ -254,67 +237,110 @@ body {
   font-size: 0.75rem;
 }
 
-/* Alerts */
-.alert {
-  display: grid;
-  gap: 6px;
-  padding: 14px 16px;
-  border-radius: var(--r-m);
-  border-left: 8px solid var(--warn);
-  background: var(--warn-soft);
-}
-.alert-title {
+/* Big choice buttons (check-in, track) */
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 76px;
+  padding: 12px 18px;
+  border-radius: var(--r-l);
+  border: 2px solid var(--ink);
+  background: var(--surface);
   font-weight: 700;
   font-size: 1.1rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
 }
-.alert ul {
-  margin: 0;
-  padding-left: 1.1em;
+.choice-quiet {
+  border-color: var(--line);
 }
-.alert-stop {
-  border-left-color: var(--stop);
-  background: var(--stop-soft);
+.choice-icon {
+  font-size: 2rem;
 }
-.alert-go {
-  border-left-color: var(--go);
-  background: var(--go-soft);
+.choice-sub {
+  display: block;
+  font-weight: 400;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.scanner {
+  display: grid;
+  gap: 10px;
+}
+.scanner video {
+  width: 100%;
+  border-radius: var(--r-l);
+  border: 4px solid var(--hivis);
+  background: #000;
 }
 
-/* Generic card + lists */
-.card {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border-radius: var(--r-l);
-  background: var(--surface);
-  border: 2px solid var(--line);
+/* Payslip */
+.months {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
-.card-title {
-  font-size: 1.15rem;
-}
-.rows {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.row {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+.month-chip {
+  flex: none;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
-}
-.row:first-child {
-  border-top: 0;
-}
-.row-label {
+  min-height: 44px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: var(--surface);
   font-weight: 700;
+  text-decoration: none;
 }
-.row-detail {
-  color: var(--ink-soft);
-  font-size: 0.9rem;
+.month-chip[aria-current='page'] {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.net {
+  display: grid;
+  gap: 6px;
+  padding: 20px;
+  border-radius: var(--r-l);
+  background: var(--ink);
+  color: var(--paper);
+}
+.net-label {
+  font-size: 1.05rem;
+}
+.net-amount {
+  font-size: 2.75rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.net-amount.small {
+  font-size: 2rem;
+}
+.net-sub {
+  opacity: 0.9;
+  font-size: 0.95rem;
+}
+.net .btn {
+  justify-self: start;
+  margin-top: 6px;
+}
+.paybar {
+  display: flex;
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--sunken);
+}
+.paybar > span {
+  display: block;
+  height: 100%;
+}
+.paybar-cut {
+  height: 10px;
 }
 .row-amount {
   font-weight: 700;
@@ -340,131 +366,28 @@ body {
 .sw-deduction {
   background: var(--stop);
 }
-
-/* Method choices (check-in) */
-.choices {
-  display: grid;
-  gap: 12px;
-}
-.choice {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-height: 76px;
-  padding: 12px 18px;
-  border-radius: var(--r-l);
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  font-weight: 700;
-  font-size: 1.15rem;
-  text-align: left;
-  cursor: pointer;
-}
-.choice-icon {
-  font-size: 2rem;
-}
-.scanner {
-  display: grid;
-  gap: 10px;
-}
-.scanner video {
+.records {
   width: 100%;
-  border-radius: var(--r-l);
-  border: 4px solid var(--hivis);
-  background: #000;
-}
-.code-input {
-  font-size: 2rem;
-  letter-spacing: 0.4em;
-  text-align: center;
+  border-collapse: collapse;
+  font-size: 0.92rem;
   font-variant-numeric: tabular-nums;
 }
-.demo-hint {
-  padding: 10px 14px;
-  border: 2px dashed var(--quiet);
-  border-radius: var(--r-m);
-  color: var(--quiet);
+.records th,
+.records td {
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.records tr.is-missing td {
+  color: var(--stop);
   font-weight: 700;
 }
 
-/* Payslip */
-.months {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-.month-chip {
-  flex: none;
-  min-height: 44px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 2px solid var(--line);
-  background: var(--surface);
-  font-weight: 700;
-  cursor: pointer;
-}
-.month-chip[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
-}
-.net {
-  display: grid;
-  gap: 6px;
-  padding: 20px;
-  border-radius: var(--r-l);
-  background: var(--ink);
-  color: var(--paper);
-}
-.net-label {
-  font-size: 1.05rem;
-}
-.net-amount {
-  font-size: 2.75rem;
-  font-weight: 700;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.net-sub {
-  opacity: 0.85;
-  font-size: 0.95rem;
-}
-.net .btn-hivis {
-  justify-self: start;
-  margin-top: 6px;
-}
-.paybar {
-  display: flex;
-  height: 22px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--sunken);
-}
-.paybar > span {
-  display: block;
-  height: 100%;
-}
-.paybar-cut {
-  height: 10px;
-}
-.ask-form {
-  grid-column: 1 / -1;
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-radius: var(--r-m);
-  background: var(--sunken);
-}
-
-/* Hazard picker */
+/* SpeakSafe category picker */
 .hazards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 .hazard {
   position: relative;
@@ -473,6 +396,7 @@ body {
   position: absolute;
   opacity: 0;
   inset: 0;
+  margin: 0;
 }
 .hazard label {
   display: grid;
@@ -480,6 +404,7 @@ body {
   align-content: center;
   gap: 6px;
   min-height: 108px;
+  height: 100%;
   padding: 10px 6px;
   border-radius: var(--r-m);
   border: 2px solid var(--line);
@@ -488,6 +413,7 @@ body {
   font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.2;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 .hazard-icon {
@@ -502,7 +428,6 @@ body {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
-
 .mic {
   justify-self: start;
 }
@@ -526,15 +451,15 @@ body {
 }
 .switch-help {
   grid-column: 1 / -1;
-  font-size: 0.9rem;
-  color: var(--ink-soft);
+  font-size: 0.92rem;
+  color: var(--ink);
 }
 .switch input {
   appearance: none;
   width: 64px;
   height: 36px;
   border-radius: 999px;
-  background: var(--line);
+  background: var(--ink-soft);
   position: relative;
   cursor: pointer;
   margin: 0;
@@ -557,190 +482,62 @@ body {
   transform: translateX(28px);
 }
 
-/* Report tracking */
-.track {
+/* Access code card shown once after an anonymous report */
+.code-card {
   display: grid;
-  gap: 8px;
-  padding: 14px 0;
-  border-top: 1px solid var(--line);
-}
-.track:first-child {
-  border-top: 0;
-}
-.track-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-weight: 700;
-}
-.steps {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.75rem;
-  color: var(--ink-soft);
-}
-.steps li {
-  padding-top: 8px;
-  border-top: 6px solid var(--sunken);
-}
-.steps li.is-done {
-  border-top-color: var(--go);
-  color: var(--ink);
-  font-weight: 700;
-}
-.reply {
-  padding: 10px 12px;
-  border-radius: var(--r-s);
-  background: var(--go-soft);
-}
-
-/* Feedback faces */
-.question {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-.question legend {
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-.faces {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
-}
-.face {
-  position: relative;
-}
-.face input {
-  position: absolute;
-  opacity: 0;
-  inset: 0;
-}
-.face label {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  padding: 8px 2px;
-  border-radius: var(--r-m);
-  border: 2px solid var(--line);
-  background: var(--surface);
-  font-size: 0.7rem;
-  text-align: center;
-  line-height: 1.15;
-  cursor: pointer;
-}
-.face-emoji {
-  font-size: 1.9rem;
-}
-.face input:checked + label {
-  background: var(--hivis);
-  color: var(--on-hivis);
-  border: 3px solid var(--ink);
-}
-.face input:focus-visible + label {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
-}
-
-/* Skill passport */
-.passport-days {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 16px;
-  align-items: center;
-  padding: 18px;
+  padding: 20px;
   border-radius: var(--r-l);
-  background: var(--go);
-  color: var(--on-go);
+  background: var(--ink);
+  color: var(--paper);
 }
-.passport-days strong {
-  grid-row: span 2;
-  font-size: 2.6rem;
-  line-height: 1;
+.code-label {
+  font-size: 0.95rem;
+  opacity: 0.9;
 }
-.share-link {
-  word-break: break-all;
-  padding: 10px 12px;
-  border-radius: var(--r-s);
-  background: var(--sunken);
-  font-size: 0.9rem;
+.code-value {
+  font-family: var(--mono);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+  overflow-wrap: anywhere;
+}
+.code-secret {
+  color: var(--hivis);
 }
 
-/* Login */
-.langs {
+/* Case lists */
+.case-link {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.lang-btn {
-  min-height: 56px;
-  border-radius: var(--r-m);
-  border: 2px solid var(--line);
-  background: var(--surface);
-  font-weight: 700;
-  font-size: 1.1rem;
-  cursor: pointer;
-}
-.lang-btn[aria-pressed='true'] {
-  background: var(--hivis);
-  color: var(--on-hivis);
-  border-color: var(--ink);
-}
-.demo {
-  display: grid;
-  gap: 12px;
-}
-.demo-org {
-  display: grid;
-  gap: 8px;
-}
-.demo-org h3 {
-  font-size: 1rem;
-}
-.demo-people {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.demo-person {
+  gap: 4px;
+  text-decoration: none;
   min-height: 44px;
-  padding: 6px 12px;
-  border-radius: var(--r-m);
-  border: 2px solid var(--line);
-  background: var(--surface);
-  text-align: left;
-  font-size: 0.9rem;
-  cursor: pointer;
 }
-.demo-person span {
-  display: block;
-  color: var(--ink-soft);
-  font-size: 0.8rem;
+.case-link:hover .track-head {
+  text-decoration: underline;
 }
-.footer-links {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 12px;
+.verify {
+  border-color: var(--go);
+  border-width: 3px;
 }
-.loading {
-  padding: 40px 0;
-  text-align: center;
-  color: var(--ink-soft);
+
+@media (max-width: 440px) {
+  .listen-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
 }
 
 @media (max-width: 360px) {
   .hazards {
     grid-template-columns: 1fr 1fr;
+  }
+  .brand {
+    font-size: 1rem;
   }
   .listen-label {
     position: absolute;

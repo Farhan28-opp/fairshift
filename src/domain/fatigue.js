@@ -1,22 +1,25 @@
 'use strict';
 
 const { DAY, HOUR, dayKey, addDays, round1 } = require('./time');
-const { shiftHours, hoursWithin } = require('./shifts');
+const { shiftHours, hoursWithin, isStale } = require('./shifts');
 
 const SEVERITY_RANK = Object.freeze({ warning: 1, critical: 2 });
 
 /**
- * Flags overwork patterns in the last 7 days. Each flag carries the measured
- * value and the limit, so the UI can say exactly why it fired.
+ * Excessive-hours flags for the last 7 days. Each flag carries the measured
+ * value and the configured limit, so the UI can say exactly which rule fired.
+ * Shifts with a missing check-out are skipped here; they are reported as an
+ * attendance discrepancy instead of inflating the hours.
  *
  *   LONG_SHIFT     one shift (or the one running now) longer than maxShiftHours
  *   WEEKLY_HOURS   more than weeklyHours in a rolling 7 days
- *   SHORT_REST     less than minRestHours between two shifts (back-to-back)
+ *   SHORT_REST     less than minRestHours between two shifts
  *   NO_WEEKLY_OFF  more than maxConsecutiveDays worked in a row
  */
 function evaluateFatigue(shifts, rules, now, tzOffsetMinutes) {
+  const usable = shifts.filter((s) => !isStale(s, rules, now));
   const windowStart = now - 7 * DAY;
-  const recent = shifts
+  const recent = usable
     .filter((s) => (s.checkOut ?? now) >= windowStart && s.checkIn <= now)
     .sort((a, b) => a.checkIn - b.checkIn);
   const flags = [];
@@ -56,7 +59,7 @@ function evaluateFatigue(shifts, rules, now, tzOffsetMinutes) {
     });
   }
 
-  const worked = new Set(shifts.map((s) => dayKey(s.checkIn, tzOffsetMinutes)));
+  const worked = new Set(usable.map((s) => dayKey(s.checkIn, tzOffsetMinutes)));
   let day = dayKey(now, tzOffsetMinutes);
   if (!worked.has(day)) day = addDays(day, -1);
   let streak = 0;

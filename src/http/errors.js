@@ -7,6 +7,7 @@ class HttpError extends Error {
     this.status = status;
     this.code = code;
     this.details = details;
+    this.expose = true;
   }
 }
 
@@ -14,7 +15,7 @@ function errorHandler(logger) {
   // Express needs the 4-argument signature to treat this as an error handler.
   // eslint-disable-next-line no-unused-vars
   return (err, req, res, next) => {
-    if (err instanceof HttpError) {
+    if (err?.expose && err.status && err.code) {
       return res.status(err.status).json({ error: err.code, ...(err.details ? { details: err.details } : {}) });
     }
     if (err?.type === 'entity.too.large') return res.status(413).json({ error: 'payload_too_large' });

@@ -9,56 +9,68 @@ const OTP_MAX_ATTEMPTS = 5;
 const SESSION_TTL = 12 * HOUR;
 const COOKIE = 'fs_sid';
 
-const sha256 = (value) => crypto.createHash('sha256').update(value).digest();
+const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 function parseCookies(header = '') {
   const out = {};
   for (const part of header.split(';')) {
     const i = part.indexOf('=');
-    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    if (i <= 0) continue;
+    try {
+      out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    } catch {
+      /* ignore malformed cookies */
+    }
   }
   return out;
 }
 
 /**
- * Passwordless login: phone number + one-time code. Workers never manage
- * passwords. OTPs and session ids are stored only as SHA-256 hashes.
+ * Passwordless sign-in: phone number + one-time code, so workers never manage
+ * passwords. Codes and session ids are stored only as SHA-256 hashes, in the
+ * database, so sessions survive restarts and work across Cloud Run instances.
  *
  * `sendOtp(phone, otp)` is the SMS gateway hook. In demo mode the code is
  * returned to the browser instead, because no SMS provider is configured.
  */
-function createAuth({ store, clock = Date.now, demoMode = false, secureCookies = false, sendOtp }) {
-  const otps = new Map();
-  const sessions = new Map();
-
-  function requestOtp(phone) {
-    const user = store.getUserByPhone(phone);
+function createAuth({ repo, clock = Date.now, demoMode = false, secureCookies = false, sendOtp }) {
+  async function requestOtp(phone) {
+    const user = await repo.getUserByPhone(phone);
     if (!user) return { sent: false };
     const otp = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-    otps.set(phone, { hash: sha256(otp), expiresAt: clock() + OTP_TTL, attempts: 0 });
-    if (!demoMode) sendOtp(phone, otp);
+    await repo.putOtp({ id: sha256(`otp:${phone}`), hash: sha256(otp), expiresAt: clock() + OTP_TTL, attempts: 0 });
+    if (!demoMode) await sendOtp(phone, otp);
     return { sent: true, otp: demoMode ? otp : undefined };
   }
 
-  function verifyOtp(phone, otp) {
-    const entry = otps.get(phone);
-    if (!entry || entry.expiresAt < clock()) {
-      otps.delete(phone);
-      throw new HttpError(401, 'otp_expired');
-    }
-    entry.attempts += 1;
-    if (entry.attempts > OTP_MAX_ATTEMPTS) {
-      otps.delete(phone);
-      throw new HttpError(429, 'too_many_attempts');
-    }
-    const supplied = sha256(String(otp));
-    if (!crypto.timingSafeEqual(supplied, entry.hash)) throw new HttpError(401, 'otp_incorrect');
-    otps.delete(phone);
-
-    const user = store.getUserByPhone(phone);
+  async function createSession(userId) {
     const sid = crypto.randomBytes(32).toString('base64url');
-    sessions.set(sha256(sid).toString('hex'), { userId: user.id, expiresAt: clock() + SESSION_TTL });
-    return { sid, user };
+    await repo.putSession({ id: sha256(sid), userId, createdAt: clock(), expiresAt: clock() + SESSION_TTL });
+    return sid;
+  }
+
+  async function verifyOtp(phone, otp) {
+    const id = sha256(`otp:${phone}`);
+    let outcome = 'otp_expired';
+    await repo.updateOtp(id, (entry) => {
+      if (!entry || entry.expiresAt < clock()) {
+        outcome = 'otp_expired';
+        return undefined;
+      }
+      const next = { ...entry, attempts: entry.attempts + 1 };
+      if (next.attempts > OTP_MAX_ATTEMPTS) outcome = 'too_many_attempts';
+      else outcome = crypto.timingSafeEqual(Buffer.from(sha256(String(otp))), Buffer.from(entry.hash)) ? 'ok' : 'otp_incorrect';
+      return next;
+    });
+    if (outcome !== 'ok' && outcome !== 'otp_incorrect') await repo.removeOtp(id);
+    if (outcome === 'otp_expired') throw new HttpError(401, 'otp_expired');
+    if (outcome === 'too_many_attempts') throw new HttpError(429, 'too_many_attempts');
+    if (outcome === 'otp_incorrect') throw new HttpError(401, 'otp_incorrect');
+    await repo.removeOtp(id);
+
+    const user = await repo.getUserByPhone(phone);
+    if (!user) throw new HttpError(401, 'otp_expired');
+    return { sid: await createSession(user.id), user };
   }
 
   function cookieHeader(value, maxAgeSeconds) {
@@ -71,21 +83,21 @@ function createAuth({ store, clock = Date.now, demoMode = false, secureCookies =
     res.setHeader('Set-Cookie', cookieHeader(sid, SESSION_TTL / 1000));
   }
 
-  function clearSession(req, res) {
+  async function clearSession(req, res) {
     const sid = parseCookies(req.headers.cookie)[COOKIE];
-    if (sid) sessions.delete(sha256(sid).toString('hex'));
+    if (sid) await repo.removeSession(sha256(sid));
     res.setHeader('Set-Cookie', cookieHeader('', 0));
   }
 
   /** Middleware: resolves the session cookie to `req.user` (or leaves it null). */
-  function attachUser(req, res, next) {
+  async function attachUser(req, res, next) {
     req.user = null;
     const sid = parseCookies(req.headers.cookie)[COOKIE];
     if (sid) {
-      const key = sha256(sid).toString('hex');
-      const session = sessions.get(key);
-      if (session && session.expiresAt > clock()) req.user = store.getUser(session.userId);
-      else if (session) sessions.delete(key);
+      const key = sha256(sid);
+      const session = await repo.getSession(key);
+      if (session && session.expiresAt > clock()) req.user = await repo.getUser(session.userId);
+      else if (session) await repo.removeSession(key);
     }
     next();
   }
@@ -98,7 +110,7 @@ function createAuth({ store, clock = Date.now, demoMode = false, secureCookies =
     };
   }
 
-  return { requestOtp, verifyOtp, setSessionCookie, clearSession, attachUser, requireRole };
+  return { requestOtp, verifyOtp, createSession, setSessionCookie, clearSession, attachUser, requireRole };
 }
 
-module.exports = { createAuth, parseCookies };
+module.exports = { createAuth, parseCookies, COOKIE };

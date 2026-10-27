@@ -1,0 +1,442 @@
+/* Employer dashboard: dense but calm. Works from a phone up to a desktop. */
+
+body {
+  font-size: 16px;
+}
+
+.adminbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #17202a;
+  color: #f1f3ee;
+  border-bottom: 4px solid var(--hivis);
+}
+.adminbar-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 10px 16px;
+}
+.adminbar .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-weight: 700;
+  font-size: 1.15rem;
+  text-decoration: none;
+}
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--hivis);
+  border: 4px solid #f1f3ee;
+}
+.org-name {
+  font-weight: 700;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.adminbar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-left: auto;
+}
+.adminbar .lang-switch,
+.adminbar .segmented {
+  border-color: #f1f3ee;
+  background: transparent;
+}
+.adminbar .lang-switch button,
+.adminbar .segmented button {
+  color: #f1f3ee;
+}
+.adminbar .lang-switch button + button,
+.adminbar .segmented button + button {
+  border-left-color: #f1f3ee;
+}
+.adminbar .lang-switch button[aria-pressed='true'],
+.adminbar .segmented button[aria-pressed='true'] {
+  background: var(--hivis);
+  color: #17202a;
+}
+.adminbar :focus-visible {
+  outline-color: var(--hivis);
+}
+.me {
+  font-size: 0.92rem;
+  opacity: 0.95;
+}
+.link-light {
+  color: #f1f3ee;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 16px;
+  overflow-x: auto;
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 16px;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: var(--r-s) var(--r-s) 0 0;
+  white-space: nowrap;
+}
+.tab[aria-current='page'] {
+  background: var(--hivis);
+  color: #17202a;
+}
+.tab-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f1f3ee;
+  color: #17202a;
+  font-size: 0.85rem;
+}
+
+.admin-main {
+  display: grid;
+  gap: 20px;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 20px 16px 80px;
+}
+.admin-main:focus {
+  outline: none;
+}
+.page-head {
+  display: grid;
+  gap: 4px;
+}
+.login-panel {
+  display: grid;
+  gap: 16px;
+  max-width: 520px;
+}
+
+/* KPI tiles */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.kpi {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 14px;
+  border-radius: var(--r-m);
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-top-width: 6px;
+  text-decoration: none;
+}
+a.kpi:hover .kpi-label {
+  text-decoration: underline;
+}
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-label {
+  font-weight: 700;
+}
+.kpi-note {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.kpi-stop {
+  border-top-color: var(--stop);
+}
+.kpi-warn {
+  border-top-color: var(--warn);
+}
+.kpi-go {
+  border-top-color: var(--go);
+}
+
+.admin-grid {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+@media (min-width: 960px) {
+  .admin-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+.stack {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* Fairness Radar flags */
+.flags {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.flag {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--r-m);
+  border: 2px solid var(--line);
+  border-left-width: 8px;
+}
+.flag-critical {
+  border-left-color: var(--stop);
+}
+.flag-warning {
+  border-left-color: var(--warn);
+}
+.flag-info {
+  border-left-color: var(--quiet);
+}
+.flag-head {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.flag-text {
+  font-weight: 700;
+}
+.flag-rule {
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+
+/* Attendance trend */
+.trend {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 4px;
+  align-items: end;
+  height: 120px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.trend li {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+  gap: 4px;
+}
+.trend-bar {
+  align-self: end;
+  display: block;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--go);
+  grid-row: 1;
+}
+.trend-label {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* Tables */
+.table-wrap {
+  overflow-x: auto;
+}
+.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.data th,
+.data td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.data thead th {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.data .num {
+  text-align: right;
+}
+.data tr.is-disputed {
+  background: var(--hivis-soft);
+}
+.input-num {
+  max-width: 110px;
+  min-height: 44px;
+}
+
+/* Facts list */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+.facts dt {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.facts dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+/* Case list */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.field-inline {
+  min-width: 200px;
+}
+.cases {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.case-row {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: var(--r-m);
+  border: 2px solid var(--line);
+  background: var(--surface);
+  text-decoration: none;
+}
+.case-row:hover {
+  border-color: var(--ink);
+}
+.case-row.is-overdue {
+  border-left: 8px solid var(--stop);
+}
+.case-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.case-row-title .mono {
+  font-weight: 400;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.case-row-text {
+  overflow-wrap: anywhere;
+}
+.case-row-meta {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+/* Case actions and evidence */
+.actions-card .action {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.actions-card .action h3 {
+  font-size: 1rem;
+}
+.evidence h3 {
+  font-size: 1rem;
+  margin-top: 6px;
+}
+.inline-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border-radius: var(--r-m);
+  background: var(--sunken);
+}
+.inline-form .field-wide {
+  grid-column: 1 / -1;
+}
+.inline-form .btn {
+  justify-self: start;
+}
+.add-shift > summary,
+.data details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.add-shift > summary::-webkit-details-marker,
+.data details > summary::-webkit-details-marker {
+  display: none;
+}
+.data details[open] {
+  min-width: 260px;
+}
+
+/* Settings */
+.qr {
+  width: 200px;
+  height: 200px;
+  padding: 8px;
+  background: #fff;
+  border-radius: var(--r-s);
+}
+.site-code {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+.link-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.link-list a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  font-weight: 700;
+}
+
+@media print {
+  .adminbar,
+  .skip,
+  .toast,
+  .btn,
+  form {
+    display: none !important;
+  }
+}

@@ -1,12 +1,44 @@
 'use strict';
 
-const { hazardsFor } = require('../config/sectors');
-const { slaStatus } = require('../domain/triage');
+const { categoriesFor, ESCALATION_ROLES, SEVERITIES } = require('../config/industries');
 
-/** Shapes domain records into API responses. Only whitelisted fields leave the server. */
+/** Shapes records into API responses. Only whitelisted fields leave the server (never secrets). */
 
-function presentUser(user, store) {
-  const org = store.getOrg(user.orgId);
+function presentOrg(org) {
+  return {
+    id: org.id,
+    name: org.name,
+    industry: org.industry,
+    city: org.city,
+    wageType: org.wageType,
+    categories: categoriesFor(org.industry),
+  };
+}
+
+/** The configuration an administrator can see (and partly edit). */
+function presentOrgConfig(org) {
+  return {
+    ...presentOrg(org),
+    minimumDailyWage: org.minimumDailyWage,
+    rules: {
+      dailyHours: org.rules.dailyHours,
+      weeklyHours: org.rules.weeklyHours,
+      overtimeMultiplier: org.rules.overtimeMultiplier,
+      maxShiftHours: org.rules.maxShiftHours,
+      minRestHours: org.rules.minRestHours,
+      maxConsecutiveDays: org.rules.maxConsecutiveDays,
+      staleShiftHours: org.rules.staleShiftHours,
+      workingDaysPerMonth: org.rules.workingDaysPerMonth,
+      pfRate: org.rules.pfRate,
+      esiRate: org.rules.esiRate,
+    },
+    caseRules: org.caseRules,
+    escalationRoles: ESCALATION_ROLES,
+    severities: SEVERITIES,
+  };
+}
+
+function presentUser(user, org) {
   return {
     id: user.id,
     name: user.name,
@@ -14,57 +46,9 @@ function presentUser(user, store) {
     lang: user.lang,
     title: user.title || null,
     jobRole: user.jobRole || null,
-    org: { id: org.id, name: org.name, sector: org.sector, city: org.city, hazards: hazardsFor(org.sector) },
+    wage: user.wage || null,
+    org: presentOrg(org),
   };
 }
 
-function presentReportForWorker(report) {
-  return {
-    id: report.id,
-    category: report.category,
-    status: report.status,
-    anonymous: report.anonymous,
-    urgent: report.severity === 'critical',
-    response: report.response,
-    createdAt: report.createdAt,
-    updatedAt: report.updatedAt,
-  };
-}
-
-function presentReportForAdmin(report, now, store) {
-  return {
-    id: report.id,
-    category: report.category,
-    description: report.description,
-    summaryEn: report.summaryEn,
-    lang: report.lang,
-    inputMode: report.inputMode,
-    anonymous: report.anonymous,
-    // Anonymous reports have no reporter stored at all, so there is nothing to reveal.
-    reporterName: report.anonymous ? null : store.getUser(report.reporterId)?.name || null,
-    severity: report.severity,
-    matchedKeywords: report.matchedKeywords,
-    aiAssisted: Boolean(report.aiAssisted),
-    status: report.status,
-    response: report.response,
-    createdAt: report.createdAt,
-    updatedAt: report.updatedAt,
-    sla: slaStatus(report, now),
-  };
-}
-
-function presentPayQuery(query, store) {
-  const worker = store?.getUser(query.userId);
-  return {
-    id: query.id,
-    month: query.month,
-    lineCode: query.lineCode,
-    message: query.message,
-    status: query.status,
-    response: query.response,
-    createdAt: query.createdAt,
-    ...(store ? { workerId: query.userId, workerName: worker?.name || null } : {}),
-  };
-}
-
-module.exports = { presentUser, presentReportForWorker, presentReportForAdmin, presentPayQuery };
+module.exports = { presentOrg, presentOrgConfig, presentUser };

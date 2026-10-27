@@ -1,0 +1,10 @@
+{
+  "name": "FairShift",
+  "short_name": "FairShift",
+  "description": "Record shifts, check pay, and report problems safely.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f1f3ee",
+  "theme_color": "#17202a",
+  "icons": [{ "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

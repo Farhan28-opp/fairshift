@@ -3,26 +3,10 @@
 const crypto = require('node:crypto');
 const { HOUR, dayKey, weekKey } = require('./time');
 
-const EARTH_RADIUS_M = 6_371_000;
-// GPS on budget phones is noisy; give up to 50 m of benefit of the doubt.
-const MAX_ACCURACY_CREDIT_M = 50;
-
-function distanceMeters(a, b) {
-  const rad = (deg) => (deg * Math.PI) / 180;
-  const dLat = rad(b.lat - a.lat);
-  const dLng = rad(b.lng - a.lng);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
-}
-
-function isWithinGeofence(point, site) {
-  const credit = Math.min(Math.max(point.accuracy || 0, 0), MAX_ACCURACY_CREDIT_M);
-  return distanceMeters(point, site) - credit <= site.radiusM;
-}
-
 /**
  * Six-digit check-in code printed as a QR poster at the site. It rotates daily
- * (HMAC of site + date), so a photo of yesterday's poster is useless.
+ * (HMAC of the organisation's secret + site + date), so a photo of yesterday's
+ * poster is useless. The secret is stored per organisation in the database.
  */
 function siteCode(secret, siteId, day) {
   const digest = crypto.createHmac('sha256', secret).update(`${siteId}:${day}`).digest();
@@ -39,6 +23,20 @@ function hoursWithin(shift, from, to) {
   const start = Math.max(shift.checkIn, from);
   const end = Math.min(shift.checkOut ?? to, to);
   return Math.max(0, (end - start) / HOUR);
+}
+
+/** An open shift older than `staleShiftHours` was never checked out: a record to fix, not a shift in progress. */
+function isStale(shift, rules, now) {
+  return shift.checkOut == null && now - shift.checkIn > rules.staleShiftHours * HOUR;
+}
+
+/** The shift the worker is on right now, if any. */
+function currentShift(shifts, rules, now) {
+  return shifts.filter((s) => s.checkOut == null && !isStale(s, rules, now)).sort((a, b) => b.checkIn - a.checkIn)[0] || null;
+}
+
+function missingCheckouts(shifts, rules, now) {
+  return shifts.filter((s) => isStale(s, rules, now));
 }
 
 /**
@@ -78,4 +76,4 @@ function splitHours(shifts, rules, tzOffsetMinutes) {
   return { days, hours: total('hours'), ordinaryHours: total('ordinary'), overtimeHours: total('overtime') };
 }
 
-module.exports = { distanceMeters, isWithinGeofence, siteCode, shiftHours, hoursWithin, splitHours };
+module.exports = { siteCode, shiftHours, hoursWithin, isStale, currentShift, missingCheckouts, splitHours };
